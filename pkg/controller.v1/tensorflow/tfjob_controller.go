@@ -464,6 +464,7 @@ func (r *TFJobReconciler) UpdateJobStatus(job interface{}, replicas map[commonv1
 				if running > 0 {
 					msg := fmt.Sprintf("TFJob %s/%s is running.",
 						tfJob.Namespace, tfJob.Name)
+					r.Recorder.Event(tfJob, corev1.EventTypeNormal, commonutil.JobRunningReason, msg)
 					err := commonutil.UpdateJobConditions(jobStatus,
 						commonv1.JobRunning, commonutil.JobRunningReason, msg)
 					if err != nil {
@@ -513,6 +514,7 @@ func (r *TFJobReconciler) UpdateJobStatus(job interface{}, replicas map[commonv1
 					// Some workers are still running, leave a running condition.
 					msg := fmt.Sprintf("TFJob %s/%s is running.",
 						tfJob.Namespace, tfJob.Name)
+					r.Recorder.Event(tfJob, corev1.EventTypeNormal, commonutil.JobRunningReason, msg)
 					err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, commonutil.JobRunningReason, msg)
 					if err != nil {
 						commonutil.LoggerForJob(tfJob).Infof("Append tfjob condition error: %v", err)

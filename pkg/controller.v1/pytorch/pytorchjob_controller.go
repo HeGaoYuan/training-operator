@@ -387,6 +387,7 @@ func (r *PyTorchJobReconciler) UpdateJobStatus(job interface{},
 			if rtype == commonv1.ReplicaType(kubeflowv1.PyTorchJobReplicaTypeMaster) {
 				if running > 0 {
 					msg := fmt.Sprintf("PyTorchJob %s is running.", pytorchjob.Name)
+					r.Recorder.Event(pytorchjob, corev1.EventTypeNormal, commonutil.JobRunningReason, msg)
 					err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, commonutil.JobRunningReason, msg)
 					if err != nil {
 						commonutil.LoggerForJob(pytorchjob).Infof("Append job condition error: %v", err)
@@ -433,6 +434,7 @@ func (r *PyTorchJobReconciler) UpdateJobStatus(job interface{},
 					// Some workers are still running, leave a running condition.
 					msg := fmt.Sprintf("PyTorchJob %s/%s is running.",
 						pytorchjob.Namespace, pytorchjob.Name)
+					r.Recorder.Event(pytorchjob, corev1.EventTypeNormal, commonutil.JobRunningReason, msg)
 					err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, commonutil.JobRunningReason, msg)
 					if err != nil {
 						commonutil.LoggerForJob(pytorchjob).Infof("Append pytorchjob condition error: %v", err)
@@ -545,7 +547,7 @@ func (r *PyTorchJobReconciler) onOwnerCreateFunc() func(event.CreateEvent) bool 
 		msg := fmt.Sprintf("PyTorchJob %s is created.", e.Object.GetName())
 		logrus.Info(msg)
 		trainingoperatorcommon.CreatedJobsCounterInc(pytorchjob.Namespace, kubeflowv1.PytorchJobFrameworkName)
-		if err := commonutil.UpdateJobConditions(&pytorchjob.Status, commonv1.JobCreated, "PyTorchJobCreated", msg); err != nil {
+		if err := commonutil.UpdateJobConditions(&pytorchjob.Status, commonv1.JobCreated, commonutil.JobCreatedReason, msg); err != nil {
 			logrus.Error(err, "append job condition error")
 			return false
 		}

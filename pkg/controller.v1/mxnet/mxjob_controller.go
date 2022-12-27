@@ -364,6 +364,7 @@ func (r *MXJobReconciler) UpdateJobStatus(job interface{}, replicas map[commonv1
 		if rtype == commonv1.ReplicaType(kubeflowv1.MXJobReplicaTypeScheduler) || singleTraining {
 			if running > 0 {
 				msg := fmt.Sprintf("MXJob %s is running.", mxjob.Name)
+				r.Recorder.Event(mxjob, corev1.EventTypeNormal, commonutil.JobRunningReason, msg)
 				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, commonutil.JobRunningReason, msg)
 				if err != nil {
 					logrus.Infof("Append mxjob condition error: %v", err)

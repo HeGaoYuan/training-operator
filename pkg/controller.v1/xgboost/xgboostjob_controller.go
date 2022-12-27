@@ -369,6 +369,7 @@ func (r *XGBoostJobReconciler) UpdateJobStatus(job interface{}, replicas map[com
 		if rtype == commonv1.ReplicaType(kubeflowv1.XGBoostJobReplicaTypeMaster) {
 			if running > 0 {
 				msg := fmt.Sprintf("XGBoostJob %s is running.", xgboostJob.Name)
+				r.Recorder.Event(xgboostJob, corev1.EventTypeNormal, commonutil.JobRunningReason, msg)
 				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, commonutil.JobRunningReason, msg)
 				if err != nil {
 					logger.LoggerForJob(xgboostJob).Infof("Append job condition error: %v", err)
@@ -424,6 +425,7 @@ func (r *XGBoostJobReconciler) UpdateJobStatus(job interface{}, replicas map[com
 	msg := fmt.Sprintf("XGBoostJob %s is running.", xgboostJob.Name)
 	logger.LoggerForJob(xgboostJob).Infof(msg)
 
+	r.Recorder.Event(xgboostJob, corev1.EventTypeNormal, commonutil.JobRunningReason, msg)
 	if err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, commonutil.JobRunningReason, msg); err != nil {
 		logger.LoggerForJob(xgboostJob).Error(err, "failed to update XGBoost Job conditions")
 		return err
