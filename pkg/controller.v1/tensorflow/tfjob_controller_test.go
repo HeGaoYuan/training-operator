@@ -17,6 +17,7 @@ package tensorflow
 import (
 	"context"
 	"fmt"
+	commonutil "github.com/kubeflow/common/pkg/util"
 
 	commonv1 "github.com/kubeflow/common/pkg/apis/common/v1"
 	. "github.com/onsi/ginkgo/v2"
@@ -120,7 +121,7 @@ var _ = Describe("TFJob controller", func() {
 					0, 0, 0,
 					4, 0, 0,
 					2, 0, 0,
-					&tfJobRunning, tfJobRunningReason,
+					&tfJobRunning, commonutil.JobRunningReason,
 					true,
 				},
 				"Distributed TFJob (4 workers, 2 PS) is created, 2 workers, 1 PS are pending": {
@@ -142,7 +143,7 @@ var _ = Describe("TFJob controller", func() {
 					2, 0, 2,
 					1, 0, 0,
 					0, 0, 0,
-					&tfJobRunning, tfJobRunningReason,
+					&tfJobRunning, commonutil.JobRunningReason,
 					false,
 				},
 				"Distributed TFJob (4 workers, 2 PS) is created, 2 workers, 1 PS are pending, 1 worker is succeeded": {
@@ -164,7 +165,7 @@ var _ = Describe("TFJob controller", func() {
 					0, 0, 0,
 					0, 4, 0,
 					0, 2, 0,
-					&tfJobSucceeded, tfJobSucceededReason,
+					&tfJobSucceeded, commonutil.JobSucceededReason,
 					false,
 				},
 			}

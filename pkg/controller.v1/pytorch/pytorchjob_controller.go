@@ -322,11 +322,11 @@ func (r *PyTorchJobReconciler) DeleteJob(job interface{}) error {
 		return fmt.Errorf("%+v is not a type of PyTorchJob", job)
 	}
 	if err := r.Delete(context.Background(), pytorchjob); err != nil {
-		r.recorder.Eventf(pytorchjob, corev1.EventTypeWarning, control.FailedDeletePodReason, "Error deleting: %v", err)
+		r.recorder.Eventf(pytorchjob, corev1.EventTypeWarning, "FailedDeleteJob", "Error deleting: %v", err)
 		logrus.Error(err, "failed to delete job", "namespace", pytorchjob.Namespace, "name", pytorchjob.Name)
 		return err
 	}
-	r.recorder.Eventf(pytorchjob, corev1.EventTypeNormal, control.SuccessfulDeletePodReason, "Deleted job: %v", pytorchjob.Name)
+	r.recorder.Eventf(pytorchjob, corev1.EventTypeNormal, "SuccessfulDeleteJob", "Deleted job: %v", pytorchjob.Name)
 	logrus.Info("job deleted", "namespace", pytorchjob.Namespace, "name", pytorchjob.Name)
 	trainingoperatorcommon.DeletedJobsCounterInc(pytorchjob.Namespace, kubeflowv1.PytorchJobFrameworkName)
 	return nil

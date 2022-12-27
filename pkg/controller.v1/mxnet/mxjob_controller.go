@@ -57,15 +57,6 @@ import (
 
 const (
 	controllerName = "mxjob-controller"
-
-	// mxJobSucceededReason is added in a mxjob when it is succeeded.
-	mxJobSucceededReason = "MXJobSucceeded"
-	// mxJobRunningReason is added in a mxjob when it is running.
-	mxJobRunningReason = "MXJobRunning"
-	// mxJobFailedReason is added in a mxjob when it is failed.
-	mxJobFailedReason = "MXJobFailed"
-	// mxJobRestarting is added in a mxjob when it is restarting.
-	mxJobRestartingReason = "MXJobRestarting"
 )
 
 // NewReconciler creates a MXJob Reconciler
@@ -323,11 +314,11 @@ func (r *MXJobReconciler) DeleteJob(job interface{}) error {
 		return fmt.Errorf("%+v is not a type of XGBoostJob", job)
 	}
 	if err := r.Delete(context.Background(), mxjob); err != nil {
-		r.Recorder.Eventf(mxjob, corev1.EventTypeWarning, control.FailedDeletePodReason, "Error deleting: %v", err)
+		r.Recorder.Eventf(mxjob, corev1.EventTypeWarning, "FailedDeleteJob", "Error deleting: %v", err)
 		logrus.Error(err, "failed to delete job", "namespace", mxjob.Namespace, "name", mxjob.Name)
 		return err
 	}
-	r.Recorder.Eventf(mxjob, corev1.EventTypeNormal, control.SuccessfulDeletePodReason, "Deleted job: %v", mxjob.Name)
+	r.Recorder.Eventf(mxjob, corev1.EventTypeNormal, "SuccessfulDeleteJob", "Deleted job: %v", mxjob.Name)
 	logrus.Info("job deleted", "namespace", mxjob.Namespace, "name", mxjob.Name)
 	trainingoperatorcommon.DeletedJobsCounterInc(mxjob.Namespace, kubeflowv1.MXJobFrameworkName)
 	return nil
@@ -373,7 +364,7 @@ func (r *MXJobReconciler) UpdateJobStatus(job interface{}, replicas map[commonv1
 		if rtype == commonv1.ReplicaType(kubeflowv1.MXJobReplicaTypeScheduler) || singleTraining {
 			if running > 0 {
 				msg := fmt.Sprintf("MXJob %s is running.", mxjob.Name)
-				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, mxJobRunningReason, msg)
+				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, commonutil.JobRunningReason, msg)
 				if err != nil {
 					logrus.Infof("Append mxjob condition error: %v", err)
 					return err
@@ -382,12 +373,12 @@ func (r *MXJobReconciler) UpdateJobStatus(job interface{}, replicas map[commonv1
 			// when scheduler is succeeded, the job is finished.
 			if expected == 0 {
 				msg := fmt.Sprintf("MXJob %s is successfully completed.", mxjob.Name)
-				r.Recorder.Event(mxjob, corev1.EventTypeNormal, mxJobSucceededReason, msg)
+				r.Recorder.Event(mxjob, corev1.EventTypeNormal, commonutil.JobSucceededReason, msg)
 				if jobStatus.CompletionTime == nil {
 					now := metav1.Now()
 					jobStatus.CompletionTime = &now
 				}
-				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobSucceeded, mxJobSucceededReason, msg)
+				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobSucceeded, commonutil.JobSucceededReason, msg)
 				if err != nil {
 					logrus.Infof("Append mxjob condition error: %v", err)
 					return err
@@ -399,8 +390,8 @@ func (r *MXJobReconciler) UpdateJobStatus(job interface{}, replicas map[commonv1
 		if failed > 0 {
 			if spec.RestartPolicy == commonv1.RestartPolicyExitCode {
 				msg := fmt.Sprintf("mxjob %s is restarting because %d %s replica(s) failed.", mxjob.Name, failed, rtype)
-				r.Recorder.Event(mxjob, corev1.EventTypeWarning, mxJobRestartingReason, msg)
-				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRestarting, mxJobRestartingReason, msg)
+				r.Recorder.Event(mxjob, corev1.EventTypeWarning, commonutil.JobRestartingReason, msg)
+				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRestarting, commonutil.JobRestartingReason, msg)
 				if err != nil {
 					logrus.Infof("Append job condition error: %v", err)
 					return err
@@ -408,12 +399,12 @@ func (r *MXJobReconciler) UpdateJobStatus(job interface{}, replicas map[commonv1
 				trainingoperatorcommon.RestartedJobsCounterInc(mxjob.Namespace, kubeflowv1.MXJobFrameworkName)
 			} else {
 				msg := fmt.Sprintf("mxjob %s is failed because %d %s replica(s) failed.", mxjob.Name, failed, rtype)
-				r.Recorder.Event(mxjob, corev1.EventTypeNormal, mxJobFailedReason, msg)
+				r.Recorder.Event(mxjob, corev1.EventTypeNormal, commonutil.JobFailedReason, msg)
 				if jobStatus.CompletionTime == nil {
 					now := metav1.Now()
 					jobStatus.CompletionTime = &now
 				}
-				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobFailed, mxJobFailedReason, msg)
+				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobFailed, commonutil.JobFailedReason, msg)
 				if err != nil {
 					logrus.Infof("Append job condition error: %v", err)
 					return err

@@ -58,18 +58,6 @@ import (
 )
 
 const (
-	// tfJobSucceededReason is added in a tfjob when it is succeeded.
-	tfJobSucceededReason = "TFJobSucceeded"
-	// tfJobRunningReason is added in a tfjob when it is running.
-	tfJobRunningReason = "TFJobRunning"
-	// tfJobFailedReason is added in a tfjob when it is failed.
-	tfJobFailedReason = "TFJobFailed"
-	// tfJobRestarting is added in a tfjob when it is restarting.
-	tfJobRestartingReason = "TFJobRestarting"
-
-	FailedDeleteJobReason     = "FailedDeleteJob"
-	SuccessfulDeleteJobReason = "SuccessfulDeleteJob"
-
 	controllerName = "tfjob-controller"
 
 	// volcanoTaskSpecKey task spec key used in pod annotation when EnableGangScheduling is true
@@ -389,12 +377,12 @@ func (r *TFJobReconciler) DeleteJob(job interface{}) error {
 
 	log := commonutil.LoggerForJob(tfJob)
 	if err := r.Delete(context.Background(), tfJob); err != nil {
-		r.recorder.Eventf(tfJob, v1.EventTypeWarning, FailedDeleteJobReason, "Error deleting: %v", err)
+		r.recorder.Eventf(tfJob, v1.EventTypeWarning, "FailedDeleteJob", "Error deleting: %v", err)
 		log.Errorf("failed to delete job %s/%s, %v", tfJob.Namespace, tfJob.Name, err)
 		return err
 	}
 
-	r.recorder.Eventf(tfJob, v1.EventTypeNormal, SuccessfulDeleteJobReason, "Deleted job: %v", tfJob.Name)
+	r.recorder.Eventf(tfJob, v1.EventTypeNormal, "SuccessfulDeleteJob", "Deleted job: %v", tfJob.Name)
 	log.Infof("job %s/%s has been deleted", tfJob.Namespace, tfJob.Name)
 	trainingoperatorcommon.DeletedJobsCounterInc(tfJob.Namespace, kubeflowv1.TFJobFrameworkName)
 	return nil
@@ -477,7 +465,7 @@ func (r *TFJobReconciler) UpdateJobStatus(job interface{}, replicas map[commonv1
 					msg := fmt.Sprintf("TFJob %s/%s is running.",
 						tfJob.Namespace, tfJob.Name)
 					err := commonutil.UpdateJobConditions(jobStatus,
-						commonv1.JobRunning, tfJobRunningReason, msg)
+						commonv1.JobRunning, commonutil.JobRunningReason, msg)
 					if err != nil {
 						commonutil.LoggerForJob(tfJob).Infof(
 							"Append tfjob condition error: %v", err)
@@ -487,13 +475,13 @@ func (r *TFJobReconciler) UpdateJobStatus(job interface{}, replicas map[commonv1
 				if expected == 0 {
 					msg := fmt.Sprintf("TFJob %s/%s successfully completed.",
 						tfJob.Namespace, tfJob.Name)
-					r.recorder.Event(tfJob, corev1.EventTypeNormal, tfJobSucceededReason, msg)
+					r.recorder.Event(tfJob, corev1.EventTypeNormal, commonutil.JobSucceededReason, msg)
 					if jobStatus.CompletionTime == nil {
 						now := metav1.Now()
 						jobStatus.CompletionTime = &now
 					}
 					err := commonutil.UpdateJobConditions(jobStatus,
-						commonv1.JobSucceeded, tfJobSucceededReason, msg)
+						commonv1.JobSucceeded, commonutil.JobSucceededReason, msg)
 					if err != nil {
 						commonutil.LoggerForJob(tfJob).Infof("Append tfjob condition error: %v", err)
 						return err
@@ -509,13 +497,13 @@ func (r *TFJobReconciler) UpdateJobStatus(job interface{}, replicas map[commonv1
 				if expected == 0 || (worker0Completed && *tfJob.Spec.SuccessPolicy != kubeflowv1.SuccessPolicyAllWorkers) {
 					msg := fmt.Sprintf("TFJob %s/%s successfully completed.",
 						tfJob.Namespace, tfJob.Name)
-					r.recorder.Event(tfJob, corev1.EventTypeNormal, tfJobSucceededReason, msg)
+					r.recorder.Event(tfJob, corev1.EventTypeNormal, commonutil.JobSucceededReason, msg)
 					if jobStatus.CompletionTime == nil {
 						now := metav1.Now()
 						jobStatus.CompletionTime = &now
 					}
 					err := commonutil.UpdateJobConditions(jobStatus,
-						commonv1.JobSucceeded, tfJobSucceededReason, msg)
+						commonv1.JobSucceeded, commonutil.JobSucceededReason, msg)
 					if err != nil {
 						commonutil.LoggerForJob(tfJob).Infof("Append tfjob condition error: %v", err)
 						return err
@@ -525,7 +513,7 @@ func (r *TFJobReconciler) UpdateJobStatus(job interface{}, replicas map[commonv1
 					// Some workers are still running, leave a running condition.
 					msg := fmt.Sprintf("TFJob %s/%s is running.",
 						tfJob.Namespace, tfJob.Name)
-					err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, tfJobRunningReason, msg)
+					err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, commonutil.JobRunningReason, msg)
 					if err != nil {
 						commonutil.LoggerForJob(tfJob).Infof("Append tfjob condition error: %v", err)
 						return err
@@ -555,13 +543,13 @@ func (r *TFJobReconciler) UpdateJobStatus(job interface{}, replicas map[commonv1
 				}
 				msg := fmt.Sprintf("TFJob %s/%s has failed because %d %s replica(s) failed.",
 					tfJob.Namespace, tfJob.Name, failed, rtype)
-				r.recorder.Event(tfJob, corev1.EventTypeNormal, tfJobFailedReason, msg)
+				r.recorder.Event(tfJob, corev1.EventTypeNormal, commonutil.JobFailedReason, msg)
 				if jobStatus.CompletionTime == nil {
 					now := metav1.Now()
 					jobStatus.CompletionTime = &now
 				}
 				err := commonutil.UpdateJobConditions(jobStatus,
-					commonv1.JobFailed, tfJobFailedReason, msg)
+					commonv1.JobFailed, commonutil.JobFailedReason, msg)
 				if err != nil {
 					commonutil.LoggerForJob(tfJob).Infof("Append tfjob condition error: %v", err)
 					return err
@@ -795,8 +783,8 @@ func (r *TFJobReconciler) ReconcilePods(
 					// or we won't know which replica has been restarted in updateJobStatus after reconciling all replicas
 					msg := fmt.Sprintf("TFJob %s is restarting because %s replica(s) failed.",
 						tfJob.Name, rtype)
-					r.Recorder.Event(tfJob, corev1.EventTypeWarning, tfJobRestartingReason, msg)
-					err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRestarting, tfJobRestartingReason, msg)
+					r.Recorder.Event(tfJob, corev1.EventTypeWarning, commonutil.JobRestartingReason, msg)
+					err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRestarting, commonutil.JobRestartingReason, msg)
 					if err != nil {
 						commonutil.LoggerForJob(tfJob).Infof("Append tfjob condition error: %v", err)
 						return err

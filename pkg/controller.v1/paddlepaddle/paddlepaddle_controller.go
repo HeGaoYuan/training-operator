@@ -318,11 +318,11 @@ func (r *PaddleJobReconciler) DeleteJob(job interface{}) error {
 		return fmt.Errorf("%+v is not a type of PaddleJob", job)
 	}
 	if err := r.Delete(context.Background(), paddlejob); err != nil {
-		r.recorder.Eventf(paddlejob, corev1.EventTypeWarning, control.FailedDeletePodReason, "Error deleting: %v", err)
+		r.recorder.Eventf(paddlejob, corev1.EventTypeWarning, "FailedDeleteJob", "Error deleting: %v", err)
 		logrus.Error(err, "failed to delete job", "namespace", paddlejob.Namespace, "name", paddlejob.Name)
 		return err
 	}
-	r.recorder.Eventf(paddlejob, corev1.EventTypeNormal, control.SuccessfulDeletePodReason, "Deleted job: %v", paddlejob.Name)
+	r.recorder.Eventf(paddlejob, corev1.EventTypeNormal, "SuccessfulDeleteJob", "Deleted job: %v", paddlejob.Name)
 	logrus.Info("job deleted", "namespace", paddlejob.Namespace, "name", paddlejob.Name)
 	trainingoperatorcommon.DeletedJobsCounterInc(paddlejob.Namespace, kubeflowv1.PaddleJobFrameworkName)
 	return nil

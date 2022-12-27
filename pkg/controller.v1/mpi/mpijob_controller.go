@@ -62,11 +62,7 @@ import (
 )
 
 const (
-	FailedDeleteJobReason     = "FailedDeleteJob"
-	SuccessfulDeleteJobReason = "SuccessfulDeleteJob"
-
-	controllerName  = "mpijob-controller"
-	labelMPIJobName = "mpi-job-name"
+	controllerName = "mpijob-controller"
 )
 
 func NewReconciler(mgr manager.Manager, enableGangScheduling bool) *MPIJobReconciler {
@@ -551,12 +547,12 @@ func (jc *MPIJobReconciler) DeleteJob(job interface{}) error {
 
 	log := commonutil.LoggerForJob(mpiJob)
 	if err := jc.Delete(context.Background(), mpiJob); err != nil {
-		jc.Recorder.Eventf(mpiJob, corev1.EventTypeWarning, FailedDeleteJobReason, "Error deleting: %v", err)
+		jc.Recorder.Eventf(mpiJob, corev1.EventTypeWarning, "FailedDeleteJob", "Error deleting: %v", err)
 		log.Errorf("failed to delete job %s/%s, %v", mpiJob.Namespace, mpiJob.Name, err)
 		return err
 	}
 
-	jc.Recorder.Eventf(mpiJob, corev1.EventTypeNormal, SuccessfulDeleteJobReason, "Deleted job: %v", mpiJob.Name)
+	jc.Recorder.Eventf(mpiJob, corev1.EventTypeNormal, "SuccessfulDeleteJob", "Deleted job: %v", mpiJob.Name)
 	log.Infof("job %s/%s has been deleted", mpiJob.Namespace, mpiJob.Name)
 	trainingoperatorcommon.DeletedJobsCounterInc(mpiJob.Namespace, kubeflowv1.MPIJobFrameworkName)
 	return nil

@@ -59,20 +59,6 @@ import (
 
 const (
 	controllerName = "xgboostjob-controller"
-
-	// Reasons for job events.
-	FailedDeleteJobReason     = "FailedDeleteJob"
-	SuccessfulDeleteJobReason = "SuccessfulDeleteJob"
-	// xgboostJobCreatedReason is added in a job when it is created.
-	xgboostJobCreatedReason = "XGBoostJobCreated"
-	// xgboostJobSucceededReason is added in a job when it is succeeded.
-	xgboostJobSucceededReason = "XGBoostJobSucceeded"
-	// xgboostJobRunningReason is added in a job when it is running.
-	xgboostJobRunningReason = "XGBoostJobRunning"
-	// xgboostJobFailedReason is added in a job when it is failed.
-	xgboostJobFailedReason = "XGBoostJobFailed"
-	// xgboostJobRestartingReason is added in a job when it is restarting.
-	xgboostJobRestartingReason = "XGBoostJobRestarting"
 )
 
 // NewReconciler creates a XGBoostJob Reconciler
@@ -335,11 +321,11 @@ func (r *XGBoostJobReconciler) DeleteJob(job interface{}) error {
 		return fmt.Errorf("%+v is not a type of XGBoostJob", xgboostjob)
 	}
 	if err := r.Delete(context.Background(), xgboostjob); err != nil {
-		r.recorder.Eventf(xgboostjob, corev1.EventTypeWarning, FailedDeleteJobReason, "Error deleting: %v", err)
+		r.recorder.Eventf(xgboostjob, corev1.EventTypeWarning, "FailedDeleteJob", "Error deleting: %v", err)
 		r.Log.Error(err, "failed to delete job", "namespace", xgboostjob.Namespace, "name", xgboostjob.Name)
 		return err
 	}
-	r.recorder.Eventf(xgboostjob, corev1.EventTypeNormal, SuccessfulDeleteJobReason, "Deleted job: %v", xgboostjob.Name)
+	r.recorder.Eventf(xgboostjob, corev1.EventTypeNormal, "SuccessfulDeleteJob", "Deleted job: %v", xgboostjob.Name)
 	r.Log.Info("job deleted", "namespace", xgboostjob.Namespace, "name", xgboostjob.Name)
 	trainingoperatorcommon.DeletedJobsCounterInc(xgboostjob.Namespace, kubeflowv1.XGBoostJobFrameworkName)
 	return nil
@@ -383,7 +369,7 @@ func (r *XGBoostJobReconciler) UpdateJobStatus(job interface{}, replicas map[com
 		if rtype == commonv1.ReplicaType(kubeflowv1.XGBoostJobReplicaTypeMaster) {
 			if running > 0 {
 				msg := fmt.Sprintf("XGBoostJob %s is running.", xgboostJob.Name)
-				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, xgboostJobRunningReason, msg)
+				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, commonutil.JobRunningReason, msg)
 				if err != nil {
 					logger.LoggerForJob(xgboostJob).Infof("Append job condition error: %v", err)
 					return err
@@ -393,12 +379,12 @@ func (r *XGBoostJobReconciler) UpdateJobStatus(job interface{}, replicas map[com
 			if expected == 0 {
 				msg := fmt.Sprintf("XGBoostJob %s is successfully completed.", xgboostJob.Name)
 				logrus.Info(msg)
-				r.Recorder.Event(xgboostJob, corev1.EventTypeNormal, xgboostJobSucceededReason, msg)
+				r.Recorder.Event(xgboostJob, corev1.EventTypeNormal, commonutil.JobSucceededReason, msg)
 				if jobStatus.CompletionTime == nil {
 					now := metav1.Now()
 					jobStatus.CompletionTime = &now
 				}
-				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobSucceeded, xgboostJobSucceededReason, msg)
+				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobSucceeded, commonutil.JobSucceededReason, msg)
 				if err != nil {
 					logger.LoggerForJob(xgboostJob).Infof("Append job condition error: %v", err)
 					return err
@@ -410,8 +396,8 @@ func (r *XGBoostJobReconciler) UpdateJobStatus(job interface{}, replicas map[com
 		if failed > 0 {
 			if spec.RestartPolicy == commonv1.RestartPolicyExitCode {
 				msg := fmt.Sprintf("XGBoostJob %s is restarting because %d %s replica(s) failed.", xgboostJob.Name, failed, rtype)
-				r.Recorder.Event(xgboostJob, corev1.EventTypeWarning, xgboostJobRestartingReason, msg)
-				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRestarting, xgboostJobRestartingReason, msg)
+				r.Recorder.Event(xgboostJob, corev1.EventTypeWarning, commonutil.JobRestartingReason, msg)
+				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRestarting, commonutil.JobRestartingReason, msg)
 				if err != nil {
 					logger.LoggerForJob(xgboostJob).Infof("Append job condition error: %v", err)
 					return err
@@ -419,12 +405,12 @@ func (r *XGBoostJobReconciler) UpdateJobStatus(job interface{}, replicas map[com
 				trainingoperatorcommon.RestartedJobsCounterInc(xgboostJob.Namespace, kubeflowv1.XGBoostJobFrameworkName)
 			} else {
 				msg := fmt.Sprintf("XGBoostJob %s is failed because %d %s replica(s) failed.", xgboostJob.Name, failed, rtype)
-				r.Recorder.Event(xgboostJob, corev1.EventTypeNormal, xgboostJobFailedReason, msg)
+				r.Recorder.Event(xgboostJob, corev1.EventTypeNormal, commonutil.JobFailedReason, msg)
 				if jobStatus.CompletionTime == nil {
 					now := metav1.Now()
 					jobStatus.CompletionTime = &now
 				}
-				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobFailed, xgboostJobFailedReason, msg)
+				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobFailed, commonutil.JobFailedReason, msg)
 				if err != nil {
 					logger.LoggerForJob(xgboostJob).Infof("Append job condition error: %v", err)
 					return err
@@ -438,7 +424,7 @@ func (r *XGBoostJobReconciler) UpdateJobStatus(job interface{}, replicas map[com
 	msg := fmt.Sprintf("XGBoostJob %s is running.", xgboostJob.Name)
 	logger.LoggerForJob(xgboostJob).Infof(msg)
 
-	if err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, xgboostJobRunningReason, msg); err != nil {
+	if err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, commonutil.JobRunningReason, msg); err != nil {
 		logger.LoggerForJob(xgboostJob).Error(err, "failed to update XGBoost Job conditions")
 		return err
 	}
@@ -502,7 +488,7 @@ func (r *XGBoostJobReconciler) onOwnerCreateFunc() func(event.CreateEvent) bool 
 		msg := fmt.Sprintf("xgboostJob %s is created.", e.Object.GetName())
 		logrus.Info(msg)
 		trainingoperatorcommon.CreatedJobsCounterInc(xgboostJob.Namespace, kubeflowv1.XGBoostJobFrameworkName)
-		if err := commonutil.UpdateJobConditions(&xgboostJob.Status, commonv1.JobCreated, xgboostJobCreatedReason, msg); err != nil {
+		if err := commonutil.UpdateJobConditions(&xgboostJob.Status, commonv1.JobCreated, commonutil.JobCreatedReason, msg); err != nil {
 			log.Log.Error(err, "append job condition error")
 			return false
 		}

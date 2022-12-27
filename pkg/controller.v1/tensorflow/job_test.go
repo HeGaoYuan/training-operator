@@ -247,7 +247,7 @@ var _ = Describe("TFJob controller", func() {
 				ctx := context.Background()
 				tc.tfJob.SetName(fmt.Sprintf(jobNameTemplate, idx))
 				tc.tfJob.SetUID(uuid.NewUUID())
-				Expect(commonutil.UpdateJobConditions(&tc.tfJob.Status, commonv1.JobSucceeded, tfJobSucceededReason, "")).Should(Succeed())
+				Expect(commonutil.UpdateJobConditions(&tc.tfJob.Status, commonv1.JobSucceeded, commonutil.JobSucceededReason, "")).Should(Succeed())
 
 				refs := []metav1.OwnerReference{
 					*reconciler.GenOwnerReference(tc.tfJob),
