@@ -543,6 +543,7 @@ func (r *PaddleJobReconciler) onOwnerCreateFunc() func(event.CreateEvent) bool {
 		msg := fmt.Sprintf("PaddleJob %s is created.", e.Object.GetName())
 		logrus.Info(msg)
 		trainingoperatorcommon.CreatedJobsCounterInc(paddlejob.Namespace, kubeflowv1.PaddleJobFrameworkName)
+		r.Recorder.Event(paddlejob, corev1.EventTypeNormal, commonutil.JobCreatedReason, msg)
 		if err := commonutil.UpdateJobConditions(&paddlejob.Status, commonv1.JobCreated, commonutil.JobCreatedReason, msg); err != nil {
 			logrus.Error(err, "append job condition error")
 			return false

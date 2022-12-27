@@ -907,6 +907,7 @@ func (r *TFJobReconciler) onOwnerCreateFunc() func(event.CreateEvent) bool {
 		msg := fmt.Sprintf("TFJob %s is created.", e.Object.GetName())
 		logrus.Info(msg)
 		trainingoperatorcommon.CreatedJobsCounterInc(tfJob.Namespace, kubeflowv1.TFJobFrameworkName)
+		r.Recorder.Event(tfJob, corev1.EventTypeNormal, commonutil.JobCreatedReason, msg)
 		if err := commonutil.UpdateJobConditions(&tfJob.Status, commonv1.JobCreated, commonutil.JobCreatedReason, msg); err != nil {
 			log.Log.Error(err, "append job condition error")
 			return false

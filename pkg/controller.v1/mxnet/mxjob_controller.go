@@ -472,6 +472,7 @@ func (r *MXJobReconciler) onOwnerCreateFunc() func(event.CreateEvent) bool {
 		msg := fmt.Sprintf("MXJob %s is created.", e.Object.GetName())
 		logrus.Info(msg)
 		trainingoperatorcommon.CreatedJobsCounterInc(mxJob.Namespace, kubeflowv1.MXJobFrameworkName)
+		r.Recorder.Event(mxJob, corev1.EventTypeNormal, commonutil.JobCreatedReason, msg)
 		if err := commonutil.UpdateJobConditions(&mxJob.Status, commonv1.JobCreated, commonutil.JobCreatedReason, msg); err != nil {
 			logrus.Error(err, "append job condition error")
 			return false

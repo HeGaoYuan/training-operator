@@ -547,6 +547,7 @@ func (r *PyTorchJobReconciler) onOwnerCreateFunc() func(event.CreateEvent) bool 
 		msg := fmt.Sprintf("PyTorchJob %s is created.", e.Object.GetName())
 		logrus.Info(msg)
 		trainingoperatorcommon.CreatedJobsCounterInc(pytorchjob.Namespace, kubeflowv1.PytorchJobFrameworkName)
+		r.Recorder.Event(pytorchjob, corev1.EventTypeNormal, commonutil.JobCreatedReason, msg)
 		if err := commonutil.UpdateJobConditions(&pytorchjob.Status, commonv1.JobCreated, commonutil.JobCreatedReason, msg); err != nil {
 			logrus.Error(err, "append job condition error")
 			return false

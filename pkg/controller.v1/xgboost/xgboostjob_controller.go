@@ -490,6 +490,7 @@ func (r *XGBoostJobReconciler) onOwnerCreateFunc() func(event.CreateEvent) bool 
 		msg := fmt.Sprintf("xgboostJob %s is created.", e.Object.GetName())
 		logrus.Info(msg)
 		trainingoperatorcommon.CreatedJobsCounterInc(xgboostJob.Namespace, kubeflowv1.XGBoostJobFrameworkName)
+		r.Recorder.Event(xgboostJob, corev1.EventTypeNormal, commonutil.JobCreatedReason, msg)
 		if err := commonutil.UpdateJobConditions(&xgboostJob.Status, commonv1.JobCreated, commonutil.JobCreatedReason, msg); err != nil {
 			log.Log.Error(err, "append job condition error")
 			return false
