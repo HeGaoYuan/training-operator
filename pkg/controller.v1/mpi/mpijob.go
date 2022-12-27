@@ -82,19 +82,6 @@ const (
 	volcanoTaskSpecKey = "volcano.sh/task-spec"
 )
 
-const (
-	// mpiJobCreatedReason is added in a mpijob when it is created.
-	mpiJobCreatedReason = "MPIJobCreated"
-	// mpiJobSucceededReason is added in a mpijob when it is succeeded.
-	mpiJobSucceededReason = "MPIJobSucceeded"
-	// mpiJobRunningReason is added in a mpijob when it is running.
-	mpiJobRunningReason = "MPIJobRunning"
-	// mpiJobFailedReason is added in a mpijob when it is failed.
-	mpiJobFailedReason = "MPIJobFailed"
-	// mpiJobEvict
-	mpiJobEvict = "MPIJobEvicted"
-)
-
 // initializeMPIJobStatuses initializes the ReplicaStatuses for MPIJob.
 func initializeMPIJobStatuses(mpiJob *kubeflowv1.MPIJob, mtype commonv1.ReplicaType) {
 	replicaType := commonv1.ReplicaType(mtype)
@@ -138,7 +125,7 @@ func isEvicted(status commonv1.JobStatus) bool {
 	for _, condition := range status.Conditions {
 		if condition.Type == commonv1.JobFailed &&
 			condition.Status == corev1.ConditionTrue &&
-			condition.Reason == mpiJobEvict {
+			condition.Reason == "JobEvicted" {
 			return true
 		}
 	}

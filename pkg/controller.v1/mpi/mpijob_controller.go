@@ -319,7 +319,8 @@ func (jc *MPIJobReconciler) onOwnerCreateFunc() func(event.CreateEvent) bool {
 		msg := fmt.Sprintf("MPIJob %s/%s is created.", mpiJob.Namespace, e.Object.GetName())
 		logrus.Info(msg)
 		trainingoperatorcommon.CreatedJobsCounterInc(mpiJob.Namespace, kubeflowv1.MPIJobFrameworkName)
-		if err := commonutil.UpdateJobConditions(&mpiJob.Status, commonv1.JobCreated, mpiJobCreatedReason, msg); err != nil {
+		jc.Recorder.Event(mpiJob, corev1.EventTypeNormal, commonutil.JobCreatedReason, msg)
+		if err := commonutil.UpdateJobConditions(&mpiJob.Status, commonv1.JobCreated, commonutil.JobCreatedReason, msg); err != nil {
 			log.Log.Error(err, "append job condition error")
 			return false
 		}
@@ -395,10 +396,10 @@ func (jc *MPIJobReconciler) ReconcilePods(
 		if launcher == nil {
 			launcher, err = jc.KubeClientSet.CoreV1().Pods(mpiJob.Namespace).Create(context.Background(), jc.newLauncher(mpiJob, ctlrconfig.Config.MPIKubectlDeliveryImage, isGPULauncher), metav1.CreateOptions{})
 			if err != nil {
-				jc.Recorder.Eventf(mpiJob, corev1.EventTypeWarning, mpiJobFailedReason, "launcher pod created failed: %v", err)
+				jc.Recorder.Eventf(mpiJob, corev1.EventTypeWarning, control.FailedCreatePodReason, "launcher pod created failed: %v", err)
 				return err
 			} else {
-				jc.Recorder.Eventf(mpiJob, corev1.EventTypeNormal, mpiJobRunningReason, "launcher pod created success: %v", launcher.Name)
+				jc.Recorder.Eventf(mpiJob, corev1.EventTypeNormal, control.SuccessfulCreatePodReason, "launcher pod created success: %v", launcher.Name)
 			}
 		}
 	}
@@ -418,12 +419,12 @@ func (jc *MPIJobReconciler) updateMPIJobStatus(mpiJob *kubeflowv1.MPIJob, launch
 		if isPodSucceeded(launcher) {
 			mpiJob.Status.ReplicaStatuses[kubeflowv1.MPIJobReplicaTypeLauncher].Succeeded = 1
 			msg := fmt.Sprintf("MPIJob %s/%s successfully completed.", mpiJob.Namespace, mpiJob.Name)
-			jc.Recorder.Event(mpiJob, corev1.EventTypeNormal, mpiJobSucceededReason, msg)
+			jc.Recorder.Event(mpiJob, corev1.EventTypeNormal, commonutil.JobSucceededReason, msg)
 			if mpiJob.Status.CompletionTime == nil {
 				now := metav1.Now()
 				mpiJob.Status.CompletionTime = &now
 			}
-			err := updateMPIJobConditions(mpiJob, commonv1.JobSucceeded, mpiJobSucceededReason, msg)
+			err := updateMPIJobConditions(mpiJob, commonv1.JobSucceeded, commonutil.JobSucceededReason, msg)
 			if err != nil {
 				return err
 			}
@@ -432,11 +433,11 @@ func (jc *MPIJobReconciler) updateMPIJobStatus(mpiJob *kubeflowv1.MPIJob, launch
 			msg := fmt.Sprintf("MPIJob %s/%s has failed", mpiJob.Namespace, mpiJob.Name)
 			reason := launcher.Status.Reason
 			if reason == "" {
-				reason = mpiJobFailedReason
+				reason = commonutil.JobFailedReason
 			}
 			jc.Recorder.Event(mpiJob, corev1.EventTypeWarning, reason, msg)
 			if reason == "Evicted" {
-				reason = mpiJobEvict
+				reason = "JobEvicted"
 			} else if !isEvicted(mpiJob.Status) && mpiJob.Status.CompletionTime == nil {
 				now := metav1.Now()
 				mpiJob.Status.CompletionTime = &now
@@ -474,19 +475,19 @@ func (jc *MPIJobReconciler) updateMPIJobStatus(mpiJob *kubeflowv1.MPIJob, launch
 	}
 	if evict > 0 {
 		msg := fmt.Sprintf("%d/%d workers are evicted", evict, len(worker))
-		if err := updateMPIJobConditions(mpiJob, commonv1.JobFailed, mpiJobEvict, msg); err != nil {
+		if err := updateMPIJobConditions(mpiJob, commonv1.JobFailed, "JobEvicted", msg); err != nil {
 			return err
 		}
-		jc.Recorder.Event(mpiJob, corev1.EventTypeWarning, mpiJobEvict, msg)
+		jc.Recorder.Event(mpiJob, corev1.EventTypeWarning, "JobEvicted", msg)
 	}
 
 	if launcher != nil && launcher.Status.Phase == corev1.PodRunning && running == len(worker) {
 		msg := fmt.Sprintf("MPIJob %s/%s is running.", mpiJob.Namespace, mpiJob.Name)
-		err := updateMPIJobConditions(mpiJob, commonv1.JobRunning, mpiJobRunningReason, msg)
+		err := updateMPIJobConditions(mpiJob, commonv1.JobRunning, commonutil.JobRunningReason, msg)
 		if err != nil {
 			return err
 		}
-		jc.Recorder.Eventf(mpiJob, corev1.EventTypeNormal, "MPIJobRunning", "MPIJob %s/%s is running", mpiJob.Namespace, mpiJob.Name)
+		jc.Recorder.Eventf(mpiJob, corev1.EventTypeNormal, commonutil.JobRunningReason, "MPIJob %s/%s is running", mpiJob.Namespace, mpiJob.Name)
 	}
 	return nil
 }
@@ -585,6 +586,7 @@ func (jc *MPIJobReconciler) UpdateJobStatus(job interface{}, replicas map[common
 		if rtype == kubeflowv1.MPIJobReplicaTypeLauncher {
 			if running > 0 {
 				msg := fmt.Sprintf("MPIJob %s is running.", mpiJob.Name)
+				jc.Recorder.Event(mpiJob, corev1.EventTypeNormal, commonutil.JobRunningReason, msg)
 				err := commonutil.UpdateJobConditions(jobStatus, commonv1.JobRunning, commonutil.JobRunningReason, msg)
 				if err != nil {
 					commonutil.LoggerForJob(mpiJob).Infof("Append job condition error: %v", err)
@@ -749,11 +751,6 @@ func (jc *MPIJobReconciler) getOrCreateLauncherServiceAccount(mpiJob *kubeflowv1
 	sa := &corev1.ServiceAccount{}
 	NamespacedName := types.NamespacedName{Namespace: mpiJob.Namespace, Name: mpiJob.Name + launcherSuffix}
 	err := jc.Get(context.Background(), NamespacedName, sa)
-
-	if err == nil {
-		jc.Recorder.Eventf(mpiJob, corev1.EventTypeNormal, "ServiceAccount is exist", "ServiceAccount: %v", sa.Name)
-	}
-
 	if errors.IsNotFound(err) {
 		sa, err = jc.KubeClientSet.CoreV1().ServiceAccounts(mpiJob.Namespace).Create(context.Background(), newLauncherServiceAccount(mpiJob), metav1.CreateOptions{})
 	}
@@ -779,11 +776,6 @@ func (jc *MPIJobReconciler) getOrCreateLauncherRole(mpiJob *kubeflowv1.MPIJob, w
 	role := &rbacv1.Role{}
 	NamespacedName := types.NamespacedName{Namespace: mpiJob.Namespace, Name: mpiJob.Name + launcherSuffix}
 	err := jc.Get(context.Background(), NamespacedName, role)
-
-	if err == nil {
-		jc.Recorder.Eventf(mpiJob, corev1.EventTypeNormal, "LauncherRole is exist", "LauncherRole: %v", role.Name)
-	}
-
 	launcherRole := newLauncherRole(mpiJob, workerReplicas)
 	// If the Role doesn't exist, we'll create it.
 	if errors.IsNotFound(err) {
@@ -820,11 +812,6 @@ func (jc *MPIJobReconciler) getLauncherRoleBinding(mpiJob *kubeflowv1.MPIJob) (*
 	NamespacedName := types.NamespacedName{Namespace: mpiJob.Namespace, Name: mpiJob.Name + launcherSuffix}
 	err := jc.Get(context.Background(), NamespacedName, rb)
 	// If the RoleBinding doesn't exist, we'll create it.
-
-	if err == nil {
-		jc.Recorder.Eventf(mpiJob, corev1.EventTypeNormal, "RoleBinding is exist", "RoleBinding: %v", rb.Name)
-	}
-
 	if errors.IsNotFound(err) {
 		rb, err = jc.KubeClientSet.RbacV1().RoleBindings(mpiJob.Namespace).Create(context.Background(), newLauncherRoleBinding(mpiJob), metav1.CreateOptions{})
 	}
@@ -911,9 +898,9 @@ func (jc *MPIJobReconciler) getOrCreateWorker(mpiJob *kubeflowv1.MPIJob) ([]*cor
 			worker.Labels[commonv1.ReplicaIndexLabel] = strconv.Itoa(int(i))
 			pod, err = jc.KubeClientSet.CoreV1().Pods(mpiJob.Namespace).Create(context.Background(), worker, metav1.CreateOptions{})
 			if err == nil {
-				jc.Recorder.Eventf(mpiJob, corev1.EventTypeNormal, "SuccessfulCreatePod", "Created worker pod: %v", pod.Name)
+				jc.Recorder.Eventf(mpiJob, corev1.EventTypeNormal, control.SuccessfulCreatePodReason, "worker pod created success: %v", pod.Name)
 			} else {
-				jc.Recorder.Eventf(mpiJob, corev1.EventTypeWarning, "FailedCreatePod", "Created worker pod: %v", pod.Name)
+				jc.Recorder.Eventf(mpiJob, corev1.EventTypeWarning, control.FailedCreatePodReason, "worker pod created failed: %v", err)
 			}
 		}
 
@@ -921,7 +908,7 @@ func (jc *MPIJobReconciler) getOrCreateWorker(mpiJob *kubeflowv1.MPIJob) ([]*cor
 		// can attempt processing again later. This could have been caused by a
 		// temporary network failure, or any other transient reason.
 		if err != nil && !errors.IsNotFound(err) {
-			jc.Recorder.Eventf(mpiJob, corev1.EventTypeWarning, mpiJobFailedReason, "worker pod created failed: %v", err)
+			jc.Recorder.Eventf(mpiJob, corev1.EventTypeWarning, control.FailedCreatePodReason, "worker pod created failed: %v", err)
 			return nil, err
 		}
 		// If the worker is not controlled by this MPIJob resource, we should log
@@ -1104,6 +1091,7 @@ func (jc *MPIJobReconciler) newLauncher(mpiJob *kubeflowv1.MPIJob, kubectlDelive
 			},
 		},
 	})
+	// TODO(garryhe): remove it to job validation
 	if len(podSpec.Spec.Containers) == 0 {
 		klog.Errorln("Launcher pod does not have any containers in its spec")
 		msg := fmt.Sprintf(MessageResourceDoesNotExist, "Launcher")
