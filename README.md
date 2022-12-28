@@ -107,3 +107,11 @@ This project was originally started as a distributed training operator for Tenso
 - MPI Operator: [list of contributors](https://github.com/kubeflow/mpi-operator/graphs/contributors) and [maintainers](https://github.com/kubeflow/mpi-operator/blob/master/OWNERS).
 - XGBoost Operator: [list of contributors](https://github.com/kubeflow/xgboost-operator/graphs/contributors) and [maintainers](https://github.com/kubeflow/xgboost-operator/blob/master/OWNERS).
 - MXNet Operator: [list of contributors](https://github.com/kubeflow/mxnet-operator/graphs/contributors) and [maintainers](https://github.com/kubeflow/mxnet-operator/blob/master/OWNERS).
+
+## restartPolicy 现状
+
+以pytorchjob为例子：
+（1）如果没有设置restartPolicy，则用 PytorchJobDefaultRestartPolicy 给 replicaSpec.RestartPolicy 赋值 。kubeflow/training-operator/pkg/apis/kubeflow.org/v1/pytorch_defaults.goL79
+（2）根据 replicaSpec.RestartPolicy 的值给创建的pod的 podTemplateSpec.Spec.RestartPolicy 赋值 。kubeflow/common/pkg/core/pod.goL65-L72
+（3）调用JobController.PastBackoffLimit()函数判断容器的重启次数是否超过了设置的BackoffLimit，其中需要判断 restartPolicy ，其不能为never 。kubeflow/common/pkg/controller.v1/common/job.goL61
+（4）JobController.ReconcilePods() 函数判断pod是否是 retryable的：当pod已经fail了，然后pod的restartPolicy是RestartPolicyExitCode，而且pod的退出码符合要求，则认为可以重启，就会将该pod删除让它重新创建。kubeflow/common/pkg/controller.v1/common/pod.goL351-L354
